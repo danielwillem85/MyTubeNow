@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TubeNow</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">TubeNow</p>
+          <h1>YouTube video exporter</h1>
+          <p class="lede">Paste a YouTube link, preview the video, then export an MP4 or MP3 for content you own or have permission to save.</p>
+        </div>
+      </section>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="messages" role="status" aria-live="polite">
+            {% for category, message in messages %}
+              <p class="message {{ category }}">{{ message }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="tool">
+        <form class="url-form" method="post" action="{{ url_for('index') }}">
+          <label for="url">YouTube link</label>
+          <div class="input-row">
+            <input id="url" name="url" type="url" placeholder="https://www.youtube.com/watch?v=..." value="{{ submitted_url }}" required>
+            <button type="submit">Fetch</button>
+          </div>
+        </form>
+
+        {% if video %}
+          <article class="video-result">
+            {% if video.thumbnail %}
+              <img src="{{ video.thumbnail }}" alt="" class="thumbnail">
+            {% endif %}
+            <div class="video-details">
+              <p class="label">Ready to export</p>
+              <h2>{{ video.title }}</h2>
+              <dl>
+                {% if video.uploader %}
+                  <div>
+                    <dt>Channel</dt>
+                    <dd>{{ video.uploader }}</dd>
+                  </div>
+                {% endif %}
+                <div>
+                  <dt>Length</dt>
+                  <dd>{{ video.duration|duration }}</dd>
+                </div>
+              </dl>
+
+              <div class="actions">
+                <form class="export-form" method="post" action="{{ url_for('download') }}">
+                  <input type="hidden" name="url" value="{{ submitted_url }}">
+                  <input type="hidden" name="format" value="mp4">
+                  <button type="submit" class="secondary export-button" data-loading-label="Preparing MP4">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="button-label">Export MP4</span>
+                  </button>
+                </form>
+                <form class="export-form" method="post" action="{{ url_for('download') }}">
+                  <input type="hidden" name="url" value="{{ submitted_url }}">
+                  <input type="hidden" name="format" value="mp3">
+                  <button type="submit" class="secondary export-button" data-loading-label="Preparing MP3">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="button-label">Export MP3</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </article>
+        {% endif %}
+      </section>
+
+      <p class="fine-print">Exports depend on yt-dlp and FFmpeg. Respect YouTube terms and copyright law.</p>
+    </main>
+  </body>
+</html>
