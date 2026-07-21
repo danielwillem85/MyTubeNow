@@ -27,6 +27,7 @@ app.config["BREVO_API_KEY"] = os.environ.get("BREVO_API_KEY")
 app.config["BREVO_LIST_ID"] = os.environ.get("BREVO_LIST_ID")
 app.config["MOLLIE_API_KEY"] = os.environ.get("MOLLIE_API_KEY")
 app.config["PUBLIC_URL"] = os.environ.get("MYTUBENOW_PUBLIC_URL")
+app.config["YTDLP_COOKIE_FILE"] = os.environ.get("YTDLP_COOKIE_FILE")
 
 MOLLIE_API_URL = "https://api.mollie.com/v2"
 FREE_CONVERSIONS_PER_24_HOURS = 1
@@ -447,6 +448,20 @@ def is_youtube_url(url: str) -> bool:
     return parsed.scheme in {"http", "https"} and parsed.netloc.lower() in YOUTUBE_HOSTS
 
 
+def get_yt_dlp_auth_options() -> dict:
+    configured_path = (app.config.get("YTDLP_COOKIE_FILE") or "").strip()
+    if not configured_path:
+        return {}
+
+    cookie_path = Path(configured_path).expanduser()
+    if not cookie_path.is_file():
+        raise RuntimeError("YTDLP_COOKIE_FILE does not point to a readable file.")
+    if not os.access(cookie_path, os.R_OK):
+        raise RuntimeError("YTDLP_COOKIE_FILE is not readable by the application user.")
+
+    return {"cookiefile": str(cookie_path)}
+
+
 def get_ffmpeg_location() -> str | None:
     system_ffmpeg = shutil.which("ffmpeg")
     if system_ffmpeg:
@@ -465,6 +480,7 @@ def extract_video_info(url: str) -> dict:
         "noplaylist": True,
         "skip_download": True,
         "compat_opts": {"no-certifi"},
+        **get_yt_dlp_auth_options(),
     }
 
     with YoutubeDL(options) as ydl:
@@ -505,6 +521,7 @@ def download_media(url: str, export_format: str) -> tuple[Path, tempfile.Tempora
         "restrictfilenames": True,
         "ffmpeg_location": get_ffmpeg_location(),
         "compat_opts": {"no-certifi"},
+        **get_yt_dlp_auth_options(),
     }
 
     if export_format == "mp4":
@@ -570,8 +587,10 @@ def index():
                 video = extract_video_info(submitted_url)
                 submitted_url = video["webpage_url"]
             except DownloadError:
+                app.logger.exception("yt-dlp could not extract video metadata.")
                 flash("Could not read that video. Check the link or try another public video.", "error")
             except Exception:
+                app.logger.exception("Could not fetch video metadata.")
                 flash("Something went wrong while fetching the video details.", "error")
 
     elif submitted_url and g.user is not None:
@@ -582,8 +601,10 @@ def index():
                 video = extract_video_info(submitted_url)
                 submitted_url = video["webpage_url"]
             except DownloadError:
+                app.logger.exception("yt-dlp could not extract video metadata.")
                 flash("Could not read that video. Check the link or try another public video.", "error")
             except Exception:
+                app.logger.exception("Could not fetch video metadata.")
                 flash("Something went wrong while fetching the video details.", "error")
 
     return render_template(
@@ -816,10 +837,12 @@ def download():
         file_path, temp_dir = download_media(url, export_format)
     except DownloadError:
         release_conversion(reservation_id)
+        app.logger.exception("yt-dlp could not export the requested video.")
         flash("The export failed. The video may be unavailable, private, or blocked.", "error")
         return redirect(url_for("index"))
     except Exception:
         release_conversion(reservation_id)
+        app.logger.exception("The video export failed before a file was created.")
         flash("The export failed before a file could be created.", "error")
         return redirect(url_for("index"))
 

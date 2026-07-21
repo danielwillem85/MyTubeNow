@@ -31,6 +31,16 @@ $env:BREVO_LIST_ID="your-numeric-list-id"
 
 The app uses Brevo's direct contact endpoint and does not send a double-opt-in confirmation email.
 
+## YouTube authentication
+
+If YouTube requires authentication for the server's IP address, provide a Netscape-format cookie file through `YTDLP_COOKIE_FILE`:
+
+```powershell
+$env:YTDLP_COOKIE_FILE="C:\secure\youtube-cookies.txt"
+```
+
+On a systemd deployment, use an absolute path such as `/home/ubuntu/MyTubeNow/secrets/youtube-cookies.txt`. The application uses the cookie file for both video previews and conversions. Keep it outside source control, restrict it to the service user, and treat it as an account credential.
+
 ## Pro subscriptions
 
 Free accounts can complete one conversion per IP address in a rolling 24-hour period. Successful conversions are recorded in SQLite and records older than 24 hours are automatically removed. Pro accounts have unlimited conversions for €4.99 per month.

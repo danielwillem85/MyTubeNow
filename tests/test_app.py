@@ -16,6 +16,7 @@ class MyTubeNowTestCase(unittest.TestCase):
             DATABASE=str(Path(self.database_dir.name) / "test.sqlite3"),
             MOLLIE_API_KEY="test_key",
             PUBLIC_URL="https://example.test",
+            YTDLP_COOKIE_FILE=None,
         )
         app_module.init_db()
         self.client = app_module.app.test_client()
@@ -92,6 +93,37 @@ class MyTubeNowTestCase(unittest.TestCase):
         self.assertIn(b'data-login-launcher', response.data)
         self.assertIn(b'>Log In</button>', response.data)
         self.assertIn(b'id="login-panel"', response.data)
+
+    def test_cookie_file_is_used_for_preview_and_conversion(self):
+        cookie_file = Path(self.database_dir.name) / "youtube-cookies.txt"
+        cookie_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+        app_module.app.config["YTDLP_COOKIE_FILE"] = str(cookie_file)
+
+        with patch.object(app_module, "YoutubeDL") as preview_ydl:
+            preview_ydl.return_value.__enter__.return_value.extract_info.return_value = {
+                "title": "Test",
+                "duration": 1,
+                "webpage_url": "https://youtu.be/test",
+            }
+            app_module.extract_video_info("https://youtu.be/test")
+
+        preview_options = preview_ydl.call_args.args[0]
+        self.assertEqual(preview_options["cookiefile"], str(cookie_file))
+
+        with patch.object(app_module, "YoutubeDL") as download_ydl:
+            def create_exported_file(urls):
+                options = download_ydl.call_args.args[0]
+                (Path(options["outtmpl"]).parent / "video.mp3").write_bytes(b"converted")
+
+            download_ydl.return_value.__enter__.return_value.download.side_effect = create_exported_file
+            exported_file, exported_dir = app_module.download_media(
+                "https://youtu.be/test", "mp3"
+            )
+
+        download_options = download_ydl.call_args.args[0]
+        self.assertEqual(download_options["cookiefile"], str(cookie_file))
+        self.assertTrue(exported_file.exists())
+        exported_dir.cleanup()
 
     def test_failed_conversion_does_not_consume_free_allowance(self):
         form = {"url": "https://youtu.be/test", "format": "mp3"}
