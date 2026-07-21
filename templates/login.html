@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Log In - MyTubeNow</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="shell auth-shell">
+      <section class="hero auth-hero">
+        <div>
+          <p class="eyebrow">MyTubeNow</p>
+          <h1>Log in</h1>
+          <p class="lede">Access your account to fetch YouTube video details and export MP4 or MP3 files.</p>
+        </div>
+      </section>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="messages" role="status" aria-live="polite">
+            {% for category, message in messages %}
+              <p class="message {{ category }}">{{ message }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="tool auth-card">
+        <form class="auth-form" method="post" action="{{ url_for('login', next=next_url) }}">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" value="{{ form.email }}" autocomplete="email" required>
+
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+          <button type="submit">Log In</button>
+        </form>
+
+        <p class="auth-switch">New here? <a href="{{ url_for('signup') }}">Create an account</a></p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,6 +1,6 @@
-# TubeNow
+# MyTubeNow
 
-A small Flask app that accepts a YouTube video URL, fetches video metadata, and exports MP4 or MP3 files with `yt-dlp`.
+A small Flask app with account creation and login that accepts a YouTube video URL, fetches video metadata, and exports MP4 or MP3 files with `yt-dlp`.
 
 Only download content you own, have permission to download, or are otherwise legally allowed to save.
 
@@ -19,6 +19,32 @@ python app.py
 ```
 
 Open `http://127.0.0.1:5000` in your browser.
+
+User accounts are stored in `instance/mytubenow.sqlite3` by default. Set `MYTUBENOW_DATABASE` to point at a different SQLite file.
+
+To add users who select the product-updates checkbox to a Brevo contact list, set these variables before starting the app:
+
+```powershell
+$env:BREVO_API_KEY="your-api-key"
+$env:BREVO_LIST_ID="your-numeric-list-id"
+```
+
+The app uses Brevo's direct contact endpoint and does not send a double-opt-in confirmation email.
+
+## Pro subscriptions
+
+Free accounts can complete one conversion per IP address in a rolling 24-hour period. Successful conversions are recorded in SQLite and records older than 24 hours are automatically removed. Pro accounts have unlimited conversions for €4.99 per month.
+
+Set a Mollie API key and the public HTTPS URL of the app before starting it:
+
+```powershell
+$env:MOLLIE_API_KEY="test_your-mollie-api-key"
+$env:MYTUBENOW_PUBLIC_URL="https://your-public-host.example"
+```
+
+Mollie must be able to reach `MYTUBENOW_PUBLIC_URL/mollie/webhook`, so a localhost URL is not sufficient for checkout testing. Use a secure tunnel or a deployed test environment and a Mollie test API key. The first €4.99 payment establishes the recurring mandate and covers the first month; the recurring monthly subscription begins one month later.
+
+The app reads the client IP from Flask's `request.remote_addr`. If it is deployed behind a reverse proxy, configure the trusted proxy to pass the real client address and apply Flask/Werkzeug proxy handling only for proxies you control.
 
 ## Notes
 

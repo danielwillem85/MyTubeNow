@@ -1,0 +1,23 @@
+<dialog class="auth-modal pro-modal" id="pro-modal" aria-labelledby="pro-title">
+  <div class="modal-header">
+    <div>
+      <p class="eyebrow">MyTubeNow Pro</p>
+      <h2 id="pro-title">Unlimited conversions</h2>
+    </div>
+    <button class="modal-close" type="button" aria-label="Close Pro popup">&times;</button>
+  </div>
+
+  <div class="pro-price" aria-label="4 euros and 99 cents per month">
+    <strong>€4.99</strong>
+    <span>per month</span>
+  </div>
+  <p class="pro-copy">Convert as many videos as you need with no daily conversion limit.</p>
+  <p class="pro-payment-note">You’ll be redirected to Mollie for the first €4.99 payment. Your membership then renews monthly.</p>
+
+  <div class="pro-actions">
+    <form method="post" action="{{ url_for('pro_checkout') }}">
+      <button type="submit">Continue securely with Mollie</button>
+    </form>
+    <button class="secondary-button" type="button" data-pro-decline>Not now</button>
+  </div>
+</dialog>

@@ -3,29 +3,40 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>TubeNow</title>
+    <title>MyTubeNow</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="{{ url_for('static', filename='app.js') }}" defer></script>
   </head>
-  <body>
+  <body data-authenticated="{{ 'true' if g.user else 'false' }}" data-auth-modal="{{ auth_modal or '' }}" data-pro-modal="{{ 'true' if pro_modal else 'false' }}">
     <main class="shell">
+      {% if g.user %}
+        <nav class="account-bar" aria-label="Account">
+          <span>Signed in as <strong>{{ g.user.email }}</strong></span>
+          {% if g.user.pro_status == "active" %}
+            <span class="pro-badge">Pro</span>
+          {% endif %}
+          <form method="post" action="{{ url_for('logout') }}">
+            <button type="submit" class="link-button">Log Out</button>
+          </form>
+        </nav>
+      {% endif %}
+
       <section class="hero">
         <div>
-          <p class="eyebrow">TubeNow</p>
+          <p class="eyebrow">MyTubeNow</p>
           <h1>YouTube video exporter</h1>
           <p class="lede">Paste a YouTube link, preview the video, then export an MP4 or MP3 for content you own or have permission to save.</p>
         </div>
       </section>
 
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
+      {% set messages = get_flashed_messages(with_categories=true) %}
+      {% if messages and not auth_modal %}
           <div class="messages" role="status" aria-live="polite">
             {% for category, message in messages %}
               <p class="message {{ category }}">{{ message }}</p>
             {% endfor %}
           </div>
-        {% endif %}
-      {% endwith %}
+      {% endif %}
 
       <section class="tool">
         <form class="url-form" method="post" action="{{ url_for('index') }}">
@@ -82,5 +93,68 @@
 
       <p class="fine-print">Exports depend on yt-dlp and FFmpeg. Respect YouTube terms and copyright law.</p>
     </main>
+
+    {% if not g.user %}
+      <dialog class="auth-modal" id="auth-modal" aria-labelledby="auth-title">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">MyTubeNow account</p>
+            <h2 id="auth-title">Continue to fetch</h2>
+          </div>
+          <button class="modal-close" type="button" aria-label="Close account popup">&times;</button>
+        </div>
+
+        <div class="auth-tabs" role="tablist" aria-label="Account options">
+          <button class="auth-tab" id="login-tab" type="button" role="tab" aria-controls="login-panel" data-auth-tab="login">Log in</button>
+          <button class="auth-tab" id="signup-tab" type="button" role="tab" aria-controls="signup-panel" data-auth-tab="signup">Create account</button>
+        </div>
+
+        {% if messages %}
+          <div class="messages modal-messages" role="status" aria-live="polite">
+            {% for category, message in messages %}
+              <p class="message {{ category }}">{{ message }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <section class="auth-panel" id="login-panel" role="tabpanel" aria-labelledby="login-tab" data-auth-panel="login">
+          <form class="auth-form" method="post" action="{{ url_for('login') }}">
+            <input type="hidden" name="pending_url" value="{{ submitted_url }}">
+            <label for="login-email">Email</label>
+            <input id="login-email" name="email" type="email" value="{{ auth_form.email or '' }}" autocomplete="email" required>
+
+            <label for="login-password">Password</label>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+
+            <button type="submit">Log In</button>
+          </form>
+        </section>
+
+        <section class="auth-panel" id="signup-panel" role="tabpanel" aria-labelledby="signup-tab" data-auth-panel="signup">
+          <form class="auth-form" method="post" action="{{ url_for('signup') }}" data-signup-form>
+            <input type="hidden" name="pending_url" value="{{ submitted_url }}">
+            <label for="signup-email">Email</label>
+            <input id="signup-email" name="email" type="email" value="{{ auth_form.email or '' }}" autocomplete="email" required>
+
+            <label for="signup-password">Password</label>
+            <input id="signup-password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+
+            <label for="signup-password-confirmation">Confirm password</label>
+            <input id="signup-password-confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="8" required>
+
+            <label class="consent-option" for="signup-marketing-opt-in">
+              <input id="signup-marketing-opt-in" name="marketing_opt_in" type="checkbox" value="yes"{% if auth_form.marketing_opt_in %} checked{% endif %}>
+              <span>Receive important MyTubeNow product updates. I can unsubscribe at any time.</span>
+            </label>
+
+            <button type="submit">Create Account</button>
+          </form>
+        </section>
+      </dialog>
+
+      {% include "_email_opt_in_dialog.html" %}
+    {% else %}
+      {% include "_pro_dialog.html" %}
+    {% endif %}
   </body>
 </html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Create Account - MyTubeNow</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  </head>
+  <body>
+    <main class="shell auth-shell">
+      <section class="hero auth-hero">
+        <div>
+          <p class="eyebrow">MyTubeNow</p>
+          <h1>Create account</h1>
+          <p class="lede">Set up a MyTubeNow account to use the exporter from your browser.</p>
+        </div>
+      </section>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="messages" role="status" aria-live="polite">
+            {% for category, message in messages %}
+              <p class="message {{ category }}">{{ message }}</p>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      <section class="tool auth-card">
+        <form class="auth-form" method="post" action="{{ url_for('signup') }}" data-signup-form>
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" value="{{ form.email }}" autocomplete="email" required>
+
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required>
+
+          <label for="password-confirmation">Confirm password</label>
+          <input id="password-confirmation" name="password_confirmation" type="password" autocomplete="new-password" minlength="8" required>
+
+          <label class="consent-option" for="marketing-opt-in">
+            <input id="marketing-opt-in" name="marketing_opt_in" type="checkbox" value="yes"{% if form.marketing_opt_in %} checked{% endif %}>
+            <span>Receive important MyTubeNow product updates. I can unsubscribe at any time.</span>
+          </label>
+
+          <button type="submit">Create Account</button>
+        </form>
+
+        <p class="auth-switch">Already have an account? <a href="{{ url_for('login') }}">Log in</a></p>
+      </section>
+    </main>
+
+    {% include "_email_opt_in_dialog.html" %}
+  </body>
+</html>
