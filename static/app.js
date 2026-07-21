@@ -7,6 +7,7 @@ const authPanels = document.querySelectorAll("[data-auth-panel]");
 const signupForms = document.querySelectorAll("[data-signup-form]");
 const emailOptInModal = document.querySelector("#email-opt-in-modal");
 const proModal = document.querySelector("#pro-modal");
+const loginLaunchers = document.querySelectorAll("[data-login-launcher]");
 
 let downloadPoll = null;
 let downloadTimeout = null;
@@ -43,6 +44,13 @@ function openAuthModal(tabName = "login") {
 
 authTabs.forEach((tab) => {
   tab.addEventListener("click", () => selectAuthTab(tab.dataset.authTab));
+});
+
+loginLaunchers.forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    openAuthModal("login");
+  });
 });
 
 authModal?.querySelector(".modal-close")?.addEventListener("click", () => authModal.close());

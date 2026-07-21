@@ -19,6 +19,12 @@
             <button type="submit" class="link-button">Log Out</button>
           </form>
         </nav>
+      {% else %}
+        <nav class="account-bar" aria-label="Account">
+          <form method="get" action="{{ url_for('login') }}" data-login-launcher>
+            <button type="submit" class="link-button">Log In</button>
+          </form>
+        </nav>
       {% endif %}
 
       <section class="hero">

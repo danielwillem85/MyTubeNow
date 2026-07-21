@@ -84,6 +84,15 @@ class MyTubeNowTestCase(unittest.TestCase):
             ).fetchone()["total"]
         self.assertEqual(count, 1)
 
+    def test_signed_out_header_has_login_button(self):
+        signed_out_client = app_module.app.test_client()
+        response = signed_out_client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'data-login-launcher', response.data)
+        self.assertIn(b'>Log In</button>', response.data)
+        self.assertIn(b'id="login-panel"', response.data)
+
     def test_failed_conversion_does_not_consume_free_allowance(self):
         form = {"url": "https://youtu.be/test", "format": "mp3"}
         with (
