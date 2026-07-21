@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Settings · MyTubeNow</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  </head>
+  <body data-authenticated="true" data-auth-modal="" data-pro-modal="false">
+    <main class="shell settings-shell">
+      <nav class="account-bar" aria-label="Account">
+        <span>Signed in as <strong>{{ g.user.email }}</strong></span>
+        {% if g.user.pro_status == "active" %}
+          <span class="pro-badge">Pro</span>
+        {% endif %}
+        <a class="account-link" href="{{ url_for('index') }}">Exporter</a>
+        <form method="post" action="{{ url_for('logout') }}">
+          <button type="submit" class="link-button">Log Out</button>
+        </form>
+      </nav>
+
+      <header class="settings-header">
+        <p class="eyebrow">MyTubeNow account</p>
+        <h1>Settings</h1>
+      </header>
+
+      {% set messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="messages" role="status" aria-live="polite">
+          {% for category, message in messages %}
+            <p class="message {{ category }}">{{ message }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <section class="settings-card" aria-labelledby="membership-title">
+        <div>
+          <p class="eyebrow">Membership</p>
+          <h2 id="membership-title">MyTubeNow Pro</h2>
+        </div>
+
+        {% if g.user.pro_status == "active" and g.user.pro_canceled_at %}
+          <span class="status-pill">Cancellation scheduled</span>
+          <p>Your subscription will not renew.</p>
+          {% if g.user.pro_access_until %}
+            <p class="settings-note">Unlimited conversions remain available through {{ g.user.pro_access_until }}.</p>
+          {% endif %}
+        {% elif g.user.pro_status == "active" %}
+          <span class="status-pill active">Active · €4.99 per month</span>
+          <p>Your subscription renews monthly through Mollie.</p>
+          {% if g.user.pro_access_until %}
+            <p class="settings-note">Your current paid period runs through {{ g.user.pro_access_until }}.</p>
+          {% endif %}
+          <button class="danger-button" type="button" data-cancel-pro-open>Cancel Pro subscription</button>
+        {% elif g.user.pro_status == "pending" %}
+          <span class="status-pill">Payment pending</span>
+          <p>Your Mollie payment or subscription activation is still being confirmed.</p>
+        {% else %}
+          <span class="status-pill">Free plan</span>
+          <p>Your account currently includes one conversion every 24 hours.</p>
+        {% endif %}
+      </section>
+    </main>
+
+    {% if g.user.pro_status == "active" and not g.user.pro_canceled_at %}
+      <dialog class="auth-modal cancel-pro-modal" id="cancel-pro-modal" aria-labelledby="cancel-pro-title">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Confirm cancellation</p>
+            <h2 id="cancel-pro-title">Cancel MyTubeNow Pro?</h2>
+          </div>
+          <button class="modal-close" type="button" aria-label="Close cancellation popup">&times;</button>
+        </div>
+        <p class="cancel-pro-copy">You will not be charged again. Unlimited conversions remain available through the end of your current paid period{% if g.user.pro_access_until %}, {{ g.user.pro_access_until }}{% endif %}.</p>
+        <div class="cancel-pro-actions">
+          <button class="secondary-button" type="button" data-cancel-pro-close>Keep Pro</button>
+          <form method="post" action="{{ url_for('cancel_pro_subscription') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="danger-button" type="submit">Confirm cancellation</button>
+          </form>
+        </div>
+      </dialog>
+    {% endif %}
+  </body>
+</html>

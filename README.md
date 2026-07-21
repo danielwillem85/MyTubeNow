@@ -54,6 +54,8 @@ $env:MYTUBENOW_PUBLIC_URL="https://your-public-host.example"
 
 Mollie must be able to reach `MYTUBENOW_PUBLIC_URL/mollie/webhook`, so a localhost URL is not sufficient for checkout testing. Use a secure tunnel or a deployed test environment and a Mollie test API key. The first €4.99 payment establishes the recurring mandate and covers the first month; the recurring monthly subscription begins one month later.
 
+Signed-in users can manage their membership from `/settings`. Canceling calls Mollie's subscription cancellation endpoint, stops future renewals, and preserves unlimited conversions through the recorded paid-through date. The cancellation form requires an explicit confirmation and a session-bound CSRF token.
+
 The app reads the client IP from Flask's `request.remote_addr`. If it is deployed behind a reverse proxy, configure the trusted proxy to pass the real client address and apply Flask/Werkzeug proxy handling only for proxies you control.
 
 ## Notes

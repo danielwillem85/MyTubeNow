@@ -8,6 +8,7 @@ const signupForms = document.querySelectorAll("[data-signup-form]");
 const emailOptInModal = document.querySelector("#email-opt-in-modal");
 const proModal = document.querySelector("#pro-modal");
 const loginLaunchers = document.querySelectorAll("[data-login-launcher]");
+const cancelProModal = document.querySelector("#cancel-pro-modal");
 
 let downloadPoll = null;
 let downloadTimeout = null;
@@ -86,6 +87,26 @@ proModal?.querySelector("[data-pro-decline]")?.addEventListener("click", closePr
 proModal?.addEventListener("click", (event) => {
   if (event.target === proModal) {
     closeProModal();
+  }
+});
+
+function closeCancelProModal() {
+  if (cancelProModal?.open) {
+    cancelProModal.close();
+  }
+}
+
+document.querySelector("[data-cancel-pro-open]")?.addEventListener("click", () => {
+  if (cancelProModal && !cancelProModal.open) {
+    cancelProModal.showModal();
+  }
+});
+
+cancelProModal?.querySelector(".modal-close")?.addEventListener("click", closeCancelProModal);
+cancelProModal?.querySelector("[data-cancel-pro-close]")?.addEventListener("click", closeCancelProModal);
+cancelProModal?.addEventListener("click", (event) => {
+  if (event.target === cancelProModal) {
+    closeCancelProModal();
   }
 });
 

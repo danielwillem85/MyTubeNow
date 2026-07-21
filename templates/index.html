@@ -15,6 +15,7 @@
           {% if g.user.pro_status == "active" %}
             <span class="pro-badge">Pro</span>
           {% endif %}
+          <a class="account-link" href="{{ url_for('settings') }}">Settings</a>
           <form method="post" action="{{ url_for('logout') }}">
             <button type="submit" class="link-button">Log Out</button>
           </form>

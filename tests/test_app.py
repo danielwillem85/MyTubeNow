@@ -328,6 +328,113 @@ class MyTubeNowTestCase(unittest.TestCase):
         self.assertEqual(user["pro_status"], "pending")
         self.assertEqual(user["mollie_customer_id"], "cst_new")
 
+    def test_settings_cancellation_requires_confirmation_and_cancels_mollie(self):
+        with app_module.app.app_context():
+            db = app_module.get_db()
+            db.execute(
+                """
+                UPDATE users
+                SET pro_status = 'active', mollie_customer_id = 'cst_settings',
+                    mollie_subscription_id = 'sub_settings',
+                    pro_access_until = '2099-08-21'
+                WHERE id = ?
+                """,
+                (self.user_id,),
+            )
+            db.commit()
+
+        settings_page = self.client.get("/settings")
+        self.assertEqual(settings_page.status_code, 200)
+        self.assertIn(b"Cancel Pro subscription", settings_page.data)
+        self.assertIn(b'id="cancel-pro-modal"', settings_page.data)
+        self.assertIn(b"Confirm cancellation", settings_page.data)
+        with self.client.session_transaction() as session:
+            csrf_token = session["csrf_token"]
+
+        with patch.object(
+            app_module,
+            "mollie_request",
+            return_value={"id": "sub_settings", "status": "canceled"},
+        ) as mollie:
+            response = self.client.post(
+                "/settings/pro/cancel",
+                data={"csrf_token": csrf_token},
+                follow_redirects=True,
+            )
+
+        mollie.assert_called_once_with(
+            "DELETE", "/customers/cst_settings/subscriptions/sub_settings"
+        )
+        self.assertIn(b"Your Pro subscription is canceled.", response.data)
+        self.assertIn(b"Cancellation scheduled", response.data)
+        self.assertNotIn(b'id="cancel-pro-modal"', response.data)
+        with app_module.app.app_context():
+            user = app_module.get_db().execute(
+                """
+                SELECT pro_status, pro_canceled_at, pro_access_until,
+                       mollie_subscription_id
+                FROM users WHERE id = ?
+                """,
+                (self.user_id,),
+            ).fetchone()
+        self.assertEqual(user["pro_status"], "active")
+        self.assertIsNotNone(user["pro_canceled_at"])
+        self.assertEqual(user["pro_access_until"], "2099-08-21")
+        self.assertEqual(user["mollie_subscription_id"], "sub_settings")
+
+    def test_cancel_subscription_rejects_missing_csrf_token(self):
+        with app_module.app.app_context():
+            db = app_module.get_db()
+            db.execute(
+                """
+                UPDATE users
+                SET pro_status = 'active', mollie_customer_id = 'cst_csrf',
+                    mollie_subscription_id = 'sub_csrf',
+                    pro_access_until = '2099-08-21'
+                WHERE id = ?
+                """,
+                (self.user_id,),
+            )
+            db.commit()
+        self.client.get("/settings")
+
+        with patch.object(app_module, "mollie_request") as mollie:
+            response = self.client.post("/settings/pro/cancel", data={})
+
+        self.assertEqual(response.status_code, 400)
+        mollie.assert_not_called()
+
+    def test_canceled_pro_access_expires_on_next_request(self):
+        with app_module.app.app_context():
+            db = app_module.get_db()
+            db.execute(
+                """
+                UPDATE users
+                SET pro_status = 'active', mollie_subscription_id = 'sub_expired',
+                    pro_canceled_at = '2000-01-01 00:00:00',
+                    pro_access_until = '2000-02-01'
+                WHERE id = ?
+                """,
+                (self.user_id,),
+            )
+            db.commit()
+
+        response = self.client.get("/settings")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Free plan", response.data)
+        with app_module.app.app_context():
+            user = app_module.get_db().execute(
+                """
+                SELECT pro_status, mollie_subscription_id, pro_canceled_at
+                FROM users WHERE id = ?
+                """,
+                (self.user_id,),
+            ).fetchone()
+        self.assertEqual(user["pro_status"], "free")
+        self.assertIsNone(user["mollie_subscription_id"])
+        self.assertIsNone(user["pro_canceled_at"])
+
 
 if __name__ == "__main__":
     unittest.main()

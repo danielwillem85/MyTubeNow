@@ -1,6 +1,7 @@
 import calendar
 import ipaddress
 import os
+import secrets
 import shutil
 import sqlite3
 import tempfile
@@ -11,7 +12,7 @@ from urllib.parse import urlparse
 
 import imageio_ffmpeg
 import requests
-from flask import Flask, flash, g, redirect, render_template, request, send_file, session, url_for
+from flask import Flask, abort, flash, g, redirect, render_template, request, send_file, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
@@ -74,6 +75,8 @@ def init_db() -> None:
             "mollie_subscription_id": "TEXT",
             "pro_status": "TEXT NOT NULL DEFAULT 'free'",
             "pro_started_at": "TEXT",
+            "pro_access_until": "TEXT",
+            "pro_canceled_at": "TEXT",
         }.items():
             if column_name not in user_columns:
                 db.execute(f"ALTER TABLE users ADD COLUMN {column_name} {definition}")
@@ -133,9 +136,24 @@ def load_logged_in_user() -> None:
     g.user = None
 
     if user_id is not None:
+        get_db().execute(
+            """
+            UPDATE users
+            SET pro_status = 'free', mollie_subscription_id = NULL,
+                pro_canceled_at = NULL
+            WHERE id = ?
+              AND pro_status = 'active'
+              AND pro_canceled_at IS NOT NULL
+              AND pro_access_until IS NOT NULL
+              AND date(pro_access_until) <= date('now')
+            """,
+            (user_id,),
+        )
+        get_db().commit()
         g.user = get_db().execute(
             """
-            SELECT id, email, pro_status, mollie_customer_id, mollie_subscription_id
+            SELECT id, email, pro_status, mollie_customer_id,
+                   mollie_subscription_id, pro_access_until, pro_canceled_at
             FROM users WHERE id = ?
             """,
             (user_id,),
@@ -256,6 +274,31 @@ def next_month(day: date) -> date:
     return date(year, month, min(day.day, calendar.monthrange(year, month)[1]))
 
 
+def paid_through_date(payment: dict) -> str:
+    paid_at = payment.get("paidAt") or ""
+    try:
+        paid_on = date.fromisoformat(paid_at[:10])
+    except ValueError:
+        paid_on = date.today()
+    return next_month(paid_on).isoformat()
+
+
+def get_csrf_token() -> str:
+    if "csrf_token" not in session:
+        session["csrf_token"] = secrets.token_urlsafe(32)
+    return session["csrf_token"]
+
+
+app.jinja_env.globals["csrf_token"] = get_csrf_token
+
+
+def require_valid_csrf_token() -> None:
+    submitted_token = request.form.get("csrf_token", "")
+    expected_token = session.get("csrf_token", "")
+    if not expected_token or not secrets.compare_digest(submitted_token, expected_token):
+        abort(400, description="Invalid form token.")
+
+
 def ensure_mollie_customer(user: sqlite3.Row) -> str:
     if user["mollie_customer_id"]:
         return user["mollie_customer_id"]
@@ -327,10 +370,11 @@ def activate_pro_from_payment(payment: dict) -> None:
         """
         UPDATE users
         SET pro_status = 'active', mollie_subscription_id = ?,
-            pro_started_at = COALESCE(pro_started_at, CURRENT_TIMESTAMP)
+            pro_started_at = COALESCE(pro_started_at, CURRENT_TIMESTAMP),
+            pro_access_until = ?, pro_canceled_at = NULL
         WHERE id = ?
         """,
-        (subscription_id, user["id"]),
+        (subscription_id, paid_through_date(payment), user["id"]),
     )
     get_db().execute(
         """
@@ -389,10 +433,20 @@ def process_mollie_payment(payment: dict) -> None:
     else:
         return
 
-    get_db().execute(
-        "UPDATE users SET pro_status = ? WHERE id = ?",
-        (new_status, user["id"]),
-    )
+    if new_status == "active":
+        get_db().execute(
+            """
+            UPDATE users
+            SET pro_status = 'active', pro_access_until = ?
+            WHERE id = ?
+            """,
+            (paid_through_date(payment), user["id"]),
+        )
+    else:
+        get_db().execute(
+            "UPDATE users SET pro_status = ? WHERE id = ?",
+            (new_status, user["id"]),
+        )
     get_db().commit()
 
 
@@ -721,6 +775,69 @@ def logout():
     session.clear()
     flash("You are logged out.", "success")
     return redirect(url_for("index"))
+
+
+@app.route("/settings")
+def settings():
+    if g.user is None:
+        flash("Log in to manage your account settings.", "error")
+        return redirect(url_for("index", auth="login"))
+    return render_template("settings.html")
+
+
+@app.route("/settings/pro/cancel", methods=["POST"])
+def cancel_pro_subscription():
+    if g.user is None:
+        return redirect(url_for("index", auth="login"))
+    require_valid_csrf_token()
+
+    if g.user["pro_status"] != "active":
+        flash("There is no active Pro subscription to cancel.", "error")
+        return redirect(url_for("settings"))
+    if g.user["pro_canceled_at"]:
+        flash("Your Pro subscription is already canceled.", "success")
+        return redirect(url_for("settings"))
+    if not g.user["mollie_customer_id"] or not g.user["mollie_subscription_id"]:
+        flash("We could not find the Mollie subscription. Please contact support.", "error")
+        return redirect(url_for("settings"))
+
+    subscription_path = (
+        f"/customers/{g.user['mollie_customer_id']}"
+        f"/subscriptions/{g.user['mollie_subscription_id']}"
+    )
+    access_until = g.user["pro_access_until"]
+
+    try:
+        if not access_until:
+            subscription = mollie_request("GET", subscription_path)
+            access_until = subscription.get("nextPaymentDate")
+        mollie_request("DELETE", subscription_path)
+    except requests.HTTPError as error:
+        if error.response is None or error.response.status_code != 404:
+            app.logger.exception("Could not cancel Mollie subscription.")
+            flash("We could not cancel your subscription right now. Please try again.", "error")
+            return redirect(url_for("settings"))
+    except (requests.RequestException, RuntimeError, KeyError):
+        app.logger.exception("Could not cancel Mollie subscription.")
+        flash("We could not cancel your subscription right now. Please try again.", "error")
+        return redirect(url_for("settings"))
+
+    if not access_until:
+        access_until = next_month(date.today()).isoformat()
+    get_db().execute(
+        """
+        UPDATE users
+        SET pro_canceled_at = CURRENT_TIMESTAMP, pro_access_until = ?
+        WHERE id = ?
+        """,
+        (access_until, g.user["id"]),
+    )
+    get_db().commit()
+    flash(
+        f"Your Pro subscription is canceled. Unlimited access remains available through {access_until}.",
+        "success",
+    )
+    return redirect(url_for("settings"))
 
 
 @app.route("/pro/checkout", methods=["POST"])
