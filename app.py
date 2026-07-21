@@ -355,10 +355,19 @@ def process_mollie_payment(payment: dict) -> None:
         if payment.get("status") == "paid":
             activate_pro_from_payment(payment)
         else:
+            payment_status = payment.get("status", "unknown")
             get_db().execute(
                 "UPDATE mollie_payments SET status = ? WHERE mollie_payment_id = ?",
-                (payment.get("status", "unknown"), payment_id),
+                (payment_status, payment_id),
             )
+            if payment_status in {"failed", "canceled", "expired"}:
+                get_db().execute(
+                    """
+                    UPDATE users SET pro_status = 'free'
+                    WHERE id = ? AND pro_status = 'pending'
+                    """,
+                    (initial_payment["user_id"],),
+                )
             get_db().commit()
         return
 
@@ -385,6 +394,14 @@ def process_mollie_payment(payment: dict) -> None:
         (new_status, user["id"]),
     )
     get_db().commit()
+
+
+def user_has_active_pro(user_id: int) -> bool:
+    row = get_db().execute(
+        "SELECT pro_status FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    return row is not None and row["pro_status"] == "active"
 
 
 def create_user(email: str, password: str, password_confirmation: str) -> tuple[bool, str]:
@@ -568,7 +585,11 @@ def duration_filter(seconds: int | None) -> str:
 def index():
     video = None
     auth_modal = request.args.get("auth") if g.user is None else None
-    pro_modal = request.args.get("pro") == "1" and g.user is not None
+    pro_modal = (
+        request.args.get("pro") == "1"
+        and g.user is not None
+        and g.user["pro_status"] == "free"
+    )
     auth_form = session.pop("auth_form", {})
     submitted_url = session.pop("pending_fetch_url", "") or auth_form.get("pending_url", "")
 
@@ -711,6 +732,9 @@ def pro_checkout():
     if g.user["pro_status"] == "active":
         flash("Your Pro membership is already active.", "success")
         return redirect(url_for("index"))
+    if g.user["pro_status"] == "pending":
+        flash("Your Pro payment is still being confirmed.", "success")
+        return redirect(url_for("index"))
 
     try:
         redirect_url = public_url("pro_return")
@@ -747,7 +771,7 @@ def pro_checkout():
         )
         get_db().commit()
         session["mollie_payment_id"] = payment["id"]
-        return redirect(checkout_url)
+        return redirect(checkout_url, code=303)
     except (requests.RequestException, RuntimeError, KeyError):
         app.logger.exception("Could not start Mollie Pro checkout.")
         flash("Pro checkout is unavailable right now. Please try again later.", "error")
@@ -759,6 +783,11 @@ def pro_return():
     if g.user is None:
         return redirect(url_for("index", auth="login"))
 
+    if g.user["pro_status"] == "active":
+        session.pop("mollie_payment_id", None)
+        flash("Your Pro membership is active.", "success")
+        return redirect(url_for("index"))
+
     payment_id = session.get("mollie_payment_id")
     if not payment_id:
         flash("We could not find your Pro payment.", "error")
@@ -769,16 +798,24 @@ def pro_return():
         process_mollie_payment(payment)
     except (requests.RequestException, RuntimeError, KeyError):
         app.logger.exception("Could not confirm Mollie Pro payment.")
+        if user_has_active_pro(g.user["id"]):
+            session.pop("mollie_payment_id", None)
+            flash("Welcome to MyTubeNow Pro. Unlimited conversions are active.", "success")
+            return redirect(url_for("index"))
         flash("Your payment is still being confirmed. Please refresh shortly.", "error")
-        return redirect(url_for("index", pro="1"))
+        return redirect(url_for("index"))
 
     status = payment.get("status")
     if status == "paid":
-        session.pop("mollie_payment_id", None)
-        flash("Welcome to MyTubeNow Pro. Unlimited conversions are active.", "success")
+        if user_has_active_pro(g.user["id"]):
+            session.pop("mollie_payment_id", None)
+            flash("Welcome to MyTubeNow Pro. Unlimited conversions are active.", "success")
+        else:
+            flash("Payment received. Your Pro membership is being activated.", "success")
         return redirect(url_for("index"))
     if status in {"open", "pending", "authorized"}:
         flash("Your payment is still being confirmed.", "error")
+        return redirect(url_for("index"))
     else:
         flash("The Pro payment was not completed.", "error")
     return redirect(url_for("index", pro="1"))

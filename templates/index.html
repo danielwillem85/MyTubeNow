@@ -159,7 +159,7 @@
       </dialog>
 
       {% include "_email_opt_in_dialog.html" %}
-    {% else %}
+    {% elif g.user.pro_status != "active" %}
       {% include "_pro_dialog.html" %}
     {% endif %}
   </body>

@@ -183,6 +183,87 @@ class MyTubeNowTestCase(unittest.TestCase):
         self.assertEqual(user["pro_status"], "active")
         self.assertEqual(user["mollie_subscription_id"], "sub_test")
 
+    def test_active_pro_return_never_renders_upgrade_modal(self):
+        with app_module.app.app_context():
+            db = app_module.get_db()
+            db.execute(
+                "UPDATE users SET pro_status = 'active' WHERE id = ?",
+                (self.user_id,),
+            )
+            db.commit()
+
+        response = self.client.get("/pro/return", follow_redirects=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Your Pro membership is active.", response.data)
+        self.assertNotIn(b'id="pro-modal"', response.data)
+        self.assertIn(b'data-pro-modal="false"', response.data)
+
+    def test_return_race_prefers_active_database_membership(self):
+        with app_module.app.app_context():
+            db = app_module.get_db()
+            db.execute(
+                "UPDATE users SET pro_status = 'pending' WHERE id = ?",
+                (self.user_id,),
+            )
+            db.commit()
+        with self.client.session_transaction() as session:
+            session["mollie_payment_id"] = "tr_race"
+
+        def activate_then_raise(payment):
+            db = app_module.get_db()
+            db.execute(
+                "UPDATE users SET pro_status = 'active' WHERE id = ?",
+                (self.user_id,),
+            )
+            db.commit()
+            raise RuntimeError("Concurrent webhook completed activation")
+
+        with (
+            patch.object(
+                app_module,
+                "mollie_request",
+                return_value={"id": "tr_race", "status": "paid"},
+            ),
+            patch.object(
+                app_module,
+                "process_mollie_payment",
+                side_effect=activate_then_raise,
+            ),
+        ):
+            response = self.client.get("/pro/return", follow_redirects=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Unlimited conversions are active.", response.data)
+        self.assertNotIn(b'id="pro-modal"', response.data)
+        with self.client.session_transaction() as session:
+            self.assertNotIn("mollie_payment_id", session)
+
+    def test_failed_initial_payment_releases_pending_membership(self):
+        with app_module.app.app_context():
+            db = app_module.get_db()
+            db.execute(
+                "UPDATE users SET pro_status = 'pending' WHERE id = ?",
+                (self.user_id,),
+            )
+            db.execute(
+                """
+                INSERT INTO mollie_payments (user_id, mollie_payment_id, status)
+                VALUES (?, 'tr_failed', 'open')
+                """,
+                (self.user_id,),
+            )
+            db.commit()
+            app_module.process_mollie_payment(
+                {"id": "tr_failed", "status": "failed"}
+            )
+            status = db.execute(
+                "SELECT pro_status FROM users WHERE id = ?",
+                (self.user_id,),
+            ).fetchone()["pro_status"]
+
+        self.assertEqual(status, "free")
+
     def test_pro_account_can_convert_repeatedly_from_same_ip(self):
         with app_module.app.app_context():
             db = app_module.get_db()
@@ -231,7 +312,7 @@ class MyTubeNowTestCase(unittest.TestCase):
         with patch.object(app_module, "mollie_request", side_effect=fake_mollie):
             response = self.client.post("/pro/checkout")
 
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 303)
         self.assertEqual(response.location, "https://www.mollie.com/checkout/test")
         payment_payload = next(call[2]["payload"] for call in calls if call[1] == "/payments")
         self.assertEqual(payment_payload["amount"], {"currency": "EUR", "value": "4.99"})
