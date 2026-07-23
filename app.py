@@ -268,6 +268,11 @@ def public_url(endpoint: str) -> str:
     return f"{base_url}{url_for(endpoint)}"
 
 
+def home_canonical_url() -> str:
+    base_url = (app.config.get("PUBLIC_URL") or request.url_root).rstrip("/")
+    return f"{base_url}/"
+
+
 def next_month(day: date) -> date:
     year = day.year + (1 if day.month == 12 else 0)
     month = 1 if day.month == 12 else day.month + 1
@@ -689,6 +694,7 @@ def index():
         auth_modal=auth_modal if auth_modal in {"login", "signup"} else None,
         pro_modal=pro_modal,
         auth_form=auth_form,
+        canonical_url=home_canonical_url(),
     )
 
 

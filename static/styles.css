@@ -297,6 +297,74 @@ dd {
   font-size: 0.92rem;
 }
 
+.seo-content {
+  display: grid;
+  gap: 36px;
+  margin-top: 54px;
+}
+
+.seo-intro {
+  max-width: 760px;
+}
+
+.seo-intro h2,
+.faq h2 {
+  margin: 0 0 16px;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  line-height: 1.1;
+}
+
+.seo-intro > p:last-child,
+.feature-grid p,
+.faq p {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.feature-grid article {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.feature-grid h3 {
+  margin: 0 0 10px;
+  font-size: 1.08rem;
+}
+
+.feature-grid p {
+  margin: 0;
+}
+
+.faq {
+  max-width: 760px;
+}
+
+.faq details {
+  border-top: 1px solid var(--line);
+  padding: 18px 0;
+}
+
+.faq details:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+.faq summary {
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.faq p {
+  margin: 12px 0 0;
+}
+
 .settings-shell {
   width: min(760px, calc(100% - 32px));
 }
@@ -597,7 +665,8 @@ a {
   }
 
   .input-row,
-  .video-result {
+  .video-result,
+  .feature-grid {
     grid-template-columns: 1fr;
   }
 

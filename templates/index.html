@@ -3,7 +3,21 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MyTubeNow</title>
+    <title>YouTube Video Exporter for MP4 &amp; MP3 | MyTubeNow</title>
+    <meta name="description" content="Preview and export YouTube videos you own or have permission to save as MP4 video or MP3 audio with MyTubeNow.">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="{{ canonical_url }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="MyTubeNow">
+    <meta property="og:title" content="YouTube Video Exporter for MP4 &amp; MP3 | MyTubeNow">
+    <meta property="og:description" content="Preview and export permitted YouTube videos as MP4 video or MP3 audio.">
+    <meta property="og:url" content="{{ canonical_url }}">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="YouTube Video Exporter for MP4 &amp; MP3 | MyTubeNow">
+    <meta name="twitter:description" content="Preview and export permitted YouTube videos as MP4 video or MP3 audio.">
+    <script type="application/ld+json">
+      {{ {"@context": "https://schema.org", "@type": "WebSite", "name": "MyTubeNow", "url": canonical_url}|tojson }}
+    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script src="{{ url_for('static', filename='app.js') }}" defer></script>
   </head>
@@ -31,7 +45,7 @@
       <section class="hero">
         <div>
           <p class="eyebrow">MyTubeNow</p>
-          <h1>YouTube video exporter</h1>
+          <h1>Export YouTube videos to MP4 or MP3</h1>
           <p class="lede">Paste a YouTube link, preview the video, then export an MP4 or MP3 for content you own or have permission to save.</p>
         </div>
       </section>
@@ -98,7 +112,46 @@
         {% endif %}
       </section>
 
-      <p class="fine-print">Exports depend on yt-dlp and FFmpeg. Respect YouTube terms and copyright law.</p>
+      <section class="seo-content" aria-labelledby="about-exporter-title">
+        <div class="seo-intro">
+          <p class="eyebrow">Simple video conversion</p>
+          <h2 id="about-exporter-title">A straightforward YouTube video exporter</h2>
+          <p>MyTubeNow lets you preview a supported public YouTube link before preparing an MP4 video or MP3 audio file. Use it for videos you created, content you have permission to save, or material you are otherwise legally allowed to download.</p>
+        </div>
+
+        <div class="feature-grid">
+          <article>
+            <h3>Export MP4 video</h3>
+            <p>Prepare a downloadable MP4 file while keeping video and audio together in a widely supported format.</p>
+          </article>
+          <article>
+            <h3>Convert to MP3 audio</h3>
+            <p>Create an MP3 audio file for permitted content when you only need the soundtrack or spoken audio.</p>
+          </article>
+          <article>
+            <h3>Preview before exporting</h3>
+            <p>Check the video title, channel, thumbnail, and duration before choosing an export format.</p>
+          </article>
+        </div>
+
+        <div class="faq" aria-labelledby="faq-title">
+          <h2 id="faq-title">Frequently asked questions</h2>
+          <details>
+            <summary>Which YouTube links does MyTubeNow support?</summary>
+            <p>MyTubeNow accepts standard YouTube and youtu.be links. The video must be available to the server; private, unavailable, age-restricted, or region-restricted videos may not work.</p>
+          </details>
+          <details>
+            <summary>Can I export any YouTube video?</summary>
+            <p>No. Only export videos you own, have permission to download, or are otherwise legally allowed to save. You remain responsible for respecting copyright and YouTube’s terms.</p>
+          </details>
+          <details>
+            <summary>How many conversions are included?</summary>
+            <p>A free account includes one conversion every 24 hours. MyTubeNow Pro includes unlimited conversions for €4.99 per month.</p>
+          </details>
+        </div>
+      </section>
+
+      <p class="fine-print">Respect YouTube terms and copyright law.</p>
     </main>
 
     {% if not g.user %}

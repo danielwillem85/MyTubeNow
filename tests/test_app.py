@@ -94,6 +94,23 @@ class MyTubeNowTestCase(unittest.TestCase):
         self.assertIn(b'>Log In</button>', response.data)
         self.assertIn(b'id="login-panel"', response.data)
 
+    def test_home_page_has_search_metadata_and_useful_content(self):
+        response = app_module.app.test_client().get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            b"<title>YouTube Video Exporter for MP4 &amp; MP3 | MyTubeNow</title>",
+            response.data,
+        )
+        self.assertIn(
+            b'<link rel="canonical" href="https://example.test/">',
+            response.data,
+        )
+        self.assertIn(b'property="og:title"', response.data)
+        self.assertIn(b'"@type": "WebSite"', response.data)
+        self.assertIn(b"A straightforward YouTube video exporter", response.data)
+        self.assertIn(b"Frequently asked questions", response.data)
+
     def test_cookie_file_is_used_for_preview_and_conversion(self):
         cookie_file = Path(self.database_dir.name) / "youtube-cookies.txt"
         cookie_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
